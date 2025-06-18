@@ -22,6 +22,15 @@ let currentBrushType = 'watercolor';
 let textureGraphics;
 let currentPatternType = 'perlin';
 
+let currentBrushSize = 10;
+const MIN_BRUSH_SIZE = 1;
+const MAX_BRUSH_SIZE = 100;
+
+let currentBrushFlow = 0.5; // Range 0.0 to 1.0
+const MIN_BRUSH_FLOW = 0.05;
+const MAX_BRUSH_FLOW = 1.0;
+const FLOW_INCREMENT = 0.05;
+
 // L-System variables
 let lsystemAxiom = 'F';
 let lsystemRules = { 'F': 'FF+[+F-F-F]-[-F+F+F]' };
@@ -105,7 +114,61 @@ function drawPerlinNoisePattern() { /* ... */ }
 function generateVoronoiSeeds() { /* ... */ }
 function drawVoronoiPattern() { /* ... */ }
 function generateDynamicPattern() { /* ... */ }
-function draw() { /* ... */ }
+function draw() {
+    background(255); // Clear the background each frame for the main canvas
+
+    // Generate and draw the dynamic pattern on patternGraphics
+    generateDynamicPattern(); // This function now handles the currentPatternType logic
+
+    // Update and draw Perlin noise if it's the current pattern and active
+    if (currentPatternType === 'perlin') {
+        drawPerlinNoisePattern(); // Draws onto patternGraphics
+        if (perlinPanActive) {
+            perlinPanXOffset += perlinPanXSpeed;
+            perlinPanYOffset += perlinPanYSpeed;
+        }
+    } else if (currentPatternType === 'rd') {
+        updateReactionDiffusion(); // Update RD simulation state
+        drawReactionDiffusionPattern(); // Draw RD pattern onto patternGraphics
+    }
+
+
+    // Display the pattern from patternGraphics onto the main canvas
+    image(patternGraphics, 0, 0);
+
+    // Apply the watercolor brush strokes from the watercolorBrush graphics object
+    image(watercolorBrush, 0, 0);
+
+
+    // Brush interaction logic
+    if (mouseIsPressed && mouseButton === LEFT) {
+        if (currentBrushType === 'watercolor') {
+            drawWatercolorStroke(mouseX, mouseY);
+        } else if (currentBrushType === 'textured') {
+            drawTexturedStroke(mouseX, mouseY);
+        } else if (currentBrushType === 'calligraphy') {
+            drawCalligraphyStroke(mouseX, mouseY, pmouseX, pmouseY);
+        }
+    }
+
+    // L-System specific drawing (if active, potentially on top or separate)
+    // This might need adjustment based on how L-systems are integrated visually
+    if (currentPatternType === 'lsystem' && lsystemString !== '') {
+        // Assuming drawLSystem() draws directly or onto a specific layer
+        // If it draws to patternGraphics, ensure it's called before image(patternGraphics,...)
+        // If it's an overlay, its current placement might be fine.
+        // For now, let's assume it draws where appropriate.
+        // drawLSystem(); // This was called inside generateDynamicPattern, ensure it's correctly placed.
+    }
+
+    // Update morph speed if audio-reactive for Perlin noise is enabled
+    if (currentPatternType === 'perlin' && audioReactivePerlinSpeed && mic && mic.getLevel) {
+        let micLevel = mic.getLevel();
+        morphSpeed = map(micLevel, 0, 0.1, 0.0001, baseMorphSpeed * 5); // Modest range for morphSpeed
+        morphSpeed = constrain(morphSpeed, 0.0001, baseMorphSpeed * 10);
+         // console.log("Audio-Reactive Morph Speed: " + morphSpeed);
+    }
+}
 function mousePressed() { /* ... */ }
 
 // Modify getCurrentBrushColor for audio-reactive hue
@@ -142,14 +205,75 @@ function getCurrentBrushColor() {
     return baseColor;
 }
 
-function drawWatercolorStroke(mx, my) { /* ... */ }
-function drawTexturedStroke(mx, my) { /* ... */ }
+function drawWatercolorStroke(mx, my) {
+    let col = getCurrentBrushColor();
+    // Apply flow to alpha for fill
+    watercolorBrush.fill(hue(col), saturation(col), brightness(col), currentBrushFlow * alpha(col));
+    watercolorBrush.noStroke(); // Watercolor dabs are usually fill only
+    watercolorBrush.ellipse(mx, my, currentBrushSize, currentBrushSize); // Draw an ellipse
+}
+
+function drawTexturedStroke(mx, my) {
+    // Draws the pre-rendered texture from textureGraphics onto the watercolorBrush canvas,
+    // scaled by currentBrushSize and tinted by currentBrushFlow.
+    let displaySize = currentBrushSize * 2; // Adjust scaling factor as needed
+    if (textureGraphics) { // Ensure textureGraphics is initialized
+        watercolorBrush.push(); // Save current drawing style
+        watercolorBrush.tint(255, currentBrushFlow * 255); // Apply flow as alpha tint
+        watercolorBrush.image(textureGraphics, mx - displaySize / 2, my - displaySize / 2, displaySize, displaySize);
+        watercolorBrush.pop(); // Restore drawing style (removes tint)
+    }
+}
+
+function drawCalligraphyStroke(mx, my, pmx, pmy) {
+    let speed = dist(mx, my, pmx, pmy);
+    // Max and min stroke weights are now relative to currentBrushSize
+    let maxWeight = currentBrushSize * 1.5;
+    let minWeight = max(MIN_BRUSH_SIZE, currentBrushSize * 0.2); // Ensure minWeight is at least MIN_BRUSH_SIZE
+    let strokeWeightValue = map(speed, 0, 20, maxWeight, minWeight);
+    strokeWeightValue = constrain(strokeWeightValue, minWeight, maxWeight);
+    watercolorBrush.strokeWeight(strokeWeightValue);
+    let col = getCurrentBrushColor();
+    // Apply flow to alpha for stroke
+    watercolorBrush.stroke(hue(col), saturation(col), brightness(col), currentBrushFlow * alpha(col));
+    watercolorBrush.strokeCap(ROUND);
+    watercolorBrush.line(pmx, pmy, mx, my);
+}
+
+function drawSprayPaintStroke(mx, my) {
+    let col = getCurrentBrushColor();
+    // Apply flow to alpha of spray dots
+    watercolorBrush.fill(hue(col), saturation(col), brightness(col), currentBrushFlow * 0.1 * 255);
+    watercolorBrush.noStroke();
+
+    let sprayRadius = currentBrushSize; // Use currentBrushSize
+    let dotsPerFrame = 50; // Density of spray - could also scale with brush size if desired
+
+    for (let i = 0; i < dotsPerFrame; i++) {
+        let angle = random(TWO_PI);
+        let radius = random(sprayRadius);
+        let offsetX = cos(angle) * radius;
+        let offsetY = sin(angle) * radius;
+        watercolorBrush.ellipse(mx + offsetX, my + offsetY, 3, 3); // Small dot size
+    }
+}
+
+function drawEraserStroke(mx, my, pmx, pmy) {
+    watercolorBrush.strokeWeight(currentBrushSize); // Use currentBrushSize
+    watercolorBrush.strokeCap(ROUND);
+
+    // Use p5.js erase() mode, with erase intensity affected by flow
+    watercolorBrush.erase(currentBrushFlow * 255, 255);
+    watercolorBrush.line(pmx, pmy, mx, my);
+    watercolorBrush.noErase();
+}
 
 
 // Modify keyPressed to add a toggle for audio-reactive brush color
 function keyPressed() {
     // Deactivate audio-reactive brush color on major mode changes
-    if (key === 'c' || key === 'C' || key === 'b' || key === 'B' || key === 'p' || key === 'P' || key === 'v' || key === 'V') {
+    // Added 'l', 's', and 'e' to the list of keys that reset flags
+    if (key === 'c' || key === 'C' || key === 'b' || key === 'B' || key === 'p' || key === 'P' || key === 'v' || key === 'V' || key.toLowerCase() === 'l' || key.toLowerCase() === 's' || key.toLowerCase() === 'e') {
         audioReactiveBrushColor = false;
         // Other morph deactivations from previous steps
         harmonyModeActive = false;
@@ -157,7 +281,7 @@ function keyPressed() {
         perlinPanActive = false;
         voronoiMorphActive = false;
         rdFeedMorphActive = false; rdKillMorphActive = false;
-        if (currentPatternType !== 'perlin' || (key === 'c' || key === 'C')) {
+        if (currentPatternType !== 'perlin' || (key === 'c' || key === 'C') || key.toLowerCase() === 'l' || key.toLowerCase() === 's' || key.toLowerCase() === 'e') { // Also reset for 'l', 's', and 'e'
              audioReactivePerlinSpeed = false;
              morphSpeed = baseMorphSpeed;
         }
@@ -165,6 +289,48 @@ function keyPressed() {
 
     if (key === 'c' || key === 'C') { /* ... clear logic ... */ }
     else if (key === 'b' || key === 'B') { /* ... brush type ... */ }
+    else if (key.toLowerCase() === 'l') {
+        currentBrushType = 'calligraphy';
+        console.log("Brush type: Calligraphy");
+        // Ensure other flags are reset, similar to other brush type switches
+        audioReactivePerlinSpeed = false;
+        morphSpeed = baseMorphSpeed;
+        harmonyModeActive = false;
+        lsystemAngleMorphActive = false;
+        lsystemLengthMorphActive = false;
+        perlinPanActive = false;
+        voronoiMorphActive = false;
+        rdFeedMorphActive = false;
+        rdKillMorphActive = false;
+    }
+    else if (key.toLowerCase() === 's') {
+        currentBrushType = 'sprayPaint';
+        console.log("Brush type: Spray Paint");
+        // Ensure other flags are reset
+        audioReactivePerlinSpeed = false;
+        morphSpeed = baseMorphSpeed;
+        harmonyModeActive = false;
+        lsystemAngleMorphActive = false;
+        lsystemLengthMorphActive = false;
+        perlinPanActive = false;
+        voronoiMorphActive = false;
+        rdFeedMorphActive = false;
+        rdKillMorphActive = false;
+    }
+    else if (key.toLowerCase() === 'e') {
+        currentBrushType = 'eraser';
+        console.log("Brush type: Eraser");
+        // Ensure other flags are reset
+        audioReactivePerlinSpeed = false;
+        morphSpeed = baseMorphSpeed;
+        harmonyModeActive = false;
+        lsystemAngleMorphActive = false;
+        lsystemLengthMorphActive = false;
+        perlinPanActive = false;
+        voronoiMorphActive = false;
+        rdFeedMorphActive = false;
+        rdKillMorphActive = false;
+    }
     else if (key === 'v' || key === 'V') { /* ... theme switch ... */ }
     else if (key === 'x' || key === 'X') { /* ... color switch ... */ }
     else if (key === 'h' || key === 'H') { /* ... harmony mode ... */ }
@@ -173,6 +339,36 @@ function keyPressed() {
         console.log("Audio-Reactive Brush Color (Hue): " + (audioReactiveBrushColor ? "ON" : "OFF"));
     }
     else if (key === 'p' || key === 'P') { /* ... pattern switching ... */ }
+    else if (key === '+' || key === '=' || key === ']') {
+        currentBrushSize += 2;
+        if (currentBrushSize > MAX_BRUSH_SIZE) {
+            currentBrushSize = MAX_BRUSH_SIZE;
+        }
+        console.log("Brush size: " + currentBrushSize);
+    }
+    else if (key === '-' || key === '_' || key === '[') {
+        currentBrushSize -= 2;
+        if (currentBrushSize < MIN_BRUSH_SIZE) {
+            currentBrushSize = MIN_BRUSH_SIZE;
+        }
+        console.log("Brush size: " + currentBrushSize);
+    }
+    else if (keyCode === 33) { // PageUp for flow increase
+        currentBrushFlow += FLOW_INCREMENT;
+        if (currentBrushFlow > MAX_BRUSH_FLOW) {
+            currentBrushFlow = MAX_BRUSH_FLOW;
+        }
+        currentBrushFlow = parseFloat(currentBrushFlow.toFixed(2));
+        console.log("Brush flow: " + currentBrushFlow);
+    }
+    else if (keyCode === 34) { // PageDown for flow decrease
+        currentBrushFlow -= FLOW_INCREMENT;
+        if (currentBrushFlow < MIN_BRUSH_FLOW) {
+            currentBrushFlow = MIN_BRUSH_FLOW;
+        }
+        currentBrushFlow = parseFloat(currentBrushFlow.toFixed(2));
+        console.log("Brush flow: " + currentBrushFlow);
+    }
 
     // Pattern-specific controls
     if (currentPatternType === 'lsystem') { /* ... L-System controls ... */ }

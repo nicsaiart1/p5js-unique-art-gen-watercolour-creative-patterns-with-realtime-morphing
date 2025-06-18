@@ -121,6 +121,133 @@ window.onload = () => {
 
     });
 
+    // --- Helper function for simulating key presses ---
+    // Ensures that global key/keyCode are temporarily set for keyPressed() and then restored.
+    function simulateKeyPress(char, code) {
+        let originalKey = window.key;
+        let originalKeyCode = window.keyCode;
+        window.key = char;
+        window.keyCode = code;
+
+        if (typeof keyPressed !== 'function') {
+            window.key = originalKey; // Restore before throwing
+            window.keyCode = originalKeyCode;
+            throw new Error('keyPressed function from sketch.js is not defined globally.');
+        }
+        keyPressed();
+
+        window.key = originalKey;
+        window.keyCode = originalKeyCode;
+    }
+
+    describe('Advanced Brush Engine Features', () => {
+        // Test Brush Type Switching
+        it('should switch to calligraphy brush when "l" is pressed', () => {
+            currentBrushType = 'watercolor'; // Reset to a known default
+            simulateKeyPress('l', 76); // L key
+            if (currentBrushType !== 'calligraphy') throw new Error(`currentBrushType did not switch to calligraphy. Value: ${currentBrushType}`);
+        });
+
+        it('should switch to sprayPaint brush when "s" is pressed', () => {
+            currentBrushType = 'watercolor';
+            simulateKeyPress('s', 83); // S key
+            if (currentBrushType !== 'sprayPaint') throw new Error(`currentBrushType did not switch to sprayPaint. Value: ${currentBrushType}`);
+        });
+
+        it('should switch to eraser brush when "e" is pressed', () => {
+            currentBrushType = 'watercolor';
+            simulateKeyPress('e', 69); // E key
+            if (currentBrushType !== 'eraser') throw new Error(`currentBrushType did not switch to eraser. Value: ${currentBrushType}`);
+        });
+
+        // Test Brush Size Adjustment
+        it('should increase currentBrushSize with "]" and cap at MAX_BRUSH_SIZE', () => {
+            if (typeof currentBrushSize === 'undefined') throw new Error('currentBrushSize is not defined.');
+            if (typeof MAX_BRUSH_SIZE === 'undefined') throw new Error('MAX_BRUSH_SIZE is not defined.');
+
+            currentBrushSize = 10;
+            simulateKeyPress(']', 221); // ] key
+            if (currentBrushSize !== 12) throw new Error(`Brush size should be 12. Got: ${currentBrushSize}`);
+
+            currentBrushSize = MAX_BRUSH_SIZE - 1;
+            simulateKeyPress(']', 221);
+            if (currentBrushSize !== MAX_BRUSH_SIZE) throw new Error(`Brush size should be ${MAX_BRUSH_SIZE}. Got: ${currentBrushSize}`);
+
+            simulateKeyPress(']', 221); // Press again at max
+            if (currentBrushSize !== MAX_BRUSH_SIZE) throw new Error(`Brush size should remain ${MAX_BRUSH_SIZE}. Got: ${currentBrushSize}`);
+        });
+
+        it('should increase currentBrushSize with "+" and cap at MAX_BRUSH_SIZE', () => {
+            currentBrushSize = 10;
+            simulateKeyPress('+', 187); // + key (often shares keycode with =)
+            if (currentBrushSize !== 12) throw new Error(`Brush size should be 12 with "+". Got: ${currentBrushSize}`);
+        });
+
+        it('should decrease currentBrushSize with "[" and floor at MIN_BRUSH_SIZE', () => {
+            if (typeof currentBrushSize === 'undefined') throw new Error('currentBrushSize is not defined.');
+            if (typeof MIN_BRUSH_SIZE === 'undefined') throw new Error('MIN_BRUSH_SIZE is not defined.');
+
+            currentBrushSize = 10;
+            simulateKeyPress('[', 219); // [ key
+            if (currentBrushSize !== 8) throw new Error(`Brush size should be 8. Got: ${currentBrushSize}`);
+
+            currentBrushSize = MIN_BRUSH_SIZE + 1;
+            simulateKeyPress('[', 219);
+            if (currentBrushSize !== MIN_BRUSH_SIZE) throw new Error(`Brush size should be ${MIN_BRUSH_SIZE}. Got: ${currentBrushSize}`);
+
+            simulateKeyPress('[', 219); // Press again at min
+            if (currentBrushSize !== MIN_BRUSH_SIZE) throw new Error(`Brush size should remain ${MIN_BRUSH_SIZE}. Got: ${currentBrushSize}`);
+        });
+
+        it('should decrease currentBrushSize with "-" and floor at MIN_BRUSH_SIZE', () => {
+            currentBrushSize = 10;
+            simulateKeyPress('-', 189); // - key (often shares keycode with _)
+            if (currentBrushSize !== 8) throw new Error(`Brush size should be 8 with "-". Got: ${currentBrushSize}`);
+        });
+
+        // Test Brush Flow Adjustment
+        it('should increase currentBrushFlow with PageUp and cap at MAX_BRUSH_FLOW', () => {
+            if (typeof currentBrushFlow === 'undefined') throw new Error('currentBrushFlow is not defined.');
+            if (typeof MAX_BRUSH_FLOW === 'undefined') throw new Error('MAX_BRUSH_FLOW is not defined.');
+            if (typeof FLOW_INCREMENT === 'undefined') throw new Error('FLOW_INCREMENT is not defined.');
+
+            currentBrushFlow = 0.5;
+            simulateKeyPress('', 33); // PageUp
+            // Use parseFloat and toFixed due to potential floating point inaccuracies
+            let expectedFlow = parseFloat((0.5 + FLOW_INCREMENT).toFixed(2));
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== expectedFlow) throw new Error(`Brush flow should be ${expectedFlow}. Got: ${currentBrushFlow}`);
+
+            currentBrushFlow = MAX_BRUSH_FLOW - FLOW_INCREMENT / 2; // Test boundary carefully
+            currentBrushFlow = parseFloat(currentBrushFlow.toFixed(2));
+            simulateKeyPress('', 33);
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== MAX_BRUSH_FLOW) throw new Error(`Brush flow should be ${MAX_BRUSH_FLOW}. Got: ${currentBrushFlow}`);
+
+            simulateKeyPress('', 33); // Press again at max
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== MAX_BRUSH_FLOW) throw new Error(`Brush flow should remain ${MAX_BRUSH_FLOW}. Got: ${currentBrushFlow}`);
+        });
+
+        it('should decrease currentBrushFlow with PageDown and floor at MIN_BRUSH_FLOW', () => {
+            if (typeof currentBrushFlow === 'undefined') throw new Error('currentBrushFlow is not defined.');
+            if (typeof MIN_BRUSH_FLOW === 'undefined') throw new Error('MIN_BRUSH_FLOW is not defined.');
+            if (typeof FLOW_INCREMENT === 'undefined') throw new Error('FLOW_INCREMENT is not defined.');
+
+            currentBrushFlow = 0.5;
+            simulateKeyPress('', 34); // PageDown
+            let expectedFlow = parseFloat((0.5 - FLOW_INCREMENT).toFixed(2));
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== expectedFlow) throw new Error(`Brush flow should be ${expectedFlow}. Got: ${currentBrushFlow}`);
+
+            currentBrushFlow = MIN_BRUSH_FLOW + FLOW_INCREMENT / 2; // Test boundary carefully
+            currentBrushFlow = parseFloat(currentBrushFlow.toFixed(2));
+            simulateKeyPress('', 34);
+             // If currentBrushFlow was MIN_BRUSH_FLOW + FLOW_INCREMENT / 2, subtracting FLOW_INCREMENT makes it MIN_BRUSH_FLOW - FLOW_INCREMENT / 2
+             // which should then be clamped to MIN_BRUSH_FLOW
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== MIN_BRUSH_FLOW) throw new Error(`Brush flow should be ${MIN_BRUSH_FLOW}. Got: ${currentBrushFlow}`);
+
+            simulateKeyPress('', 34); // Press again at min
+            if (parseFloat(currentBrushFlow.toFixed(2)) !== MIN_BRUSH_FLOW) throw new Error(`Brush flow should remain ${MIN_BRUSH_FLOW}. Got: ${currentBrushFlow}`);
+        });
+    });
+
     // Log summary
     console.log(`Total tests: ${testCount}, Passed: ${passCount}, Failed: ${testCount - passCount}`);
     if (testCount === passCount) {
