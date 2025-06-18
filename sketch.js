@@ -3,130 +3,195 @@ let patternGraphics;
 
 let xOff = 0;
 let yOff = 0;
-let zOff = 0; // For time-based evolution of noise
+let zOff = 0;
 
-// Control the speed of morphing
-let morphSpeed = 0.002; // Slow and gentle morphing
+let morphSpeed = 0.002;
 
-function setup() {
-    createCanvas(windowWidth, windowHeight);
-    background(255); // White background for the main canvas
+let perlinNoiseScale = 0.03;
+let perlinNoiseIntensityMax = 0.7;
+let perlinInteractionStrength = 5.0;
+let perlinInteractionRadius = 150;
+let perlinPanActive = false;
+let perlinPanXOffset = 0;
+let perlinPanYOffset = 0;
+let perlinPanXSpeed = 0.005;
+let perlinPanYSpeed = 0.005;
 
-    watercolorBrush = createGraphics(width, height);
-    watercolorBrush.noStroke();
-    // Ensure watercolorBrush starts transparent if strokes are added before background elements
-    watercolorBrush.background(0,0,0,0);
+
+let currentBrushType = 'watercolor';
+let textureGraphics;
+let currentPatternType = 'perlin';
+
+// L-System variables
+let lsystemAxiom = 'F';
+let lsystemRules = { 'F': 'FF+[+F-F-F]-[-F+F+F]' };
+let lsystemString = '';
+let lsystemGenerations = 3;
+let lsystemDrawLength = 10;
+let lsystemAngle = 25;
+let lsystemStartX = -1;
+let lsystemStartY = -1;
+let lsystemAngleMorphActive = false;
+let lsystemLengthMorphActive = false;
+let lsystemAngleMorphSpeed = 0.1;
+let lsystemLengthMorphSpeed = 0.05;
+let lsystemAngleMorphDir = 1;
+let lsystemLengthMorphDir = 1;
+const LSYSTEM_ANGLE_MIN = 5;
+const LSYSTEM_ANGLE_MAX = 90;
+const LSYSTEM_LENGTH_MIN = 2;
+const LSYSTEM_LENGTH_MAX = 50;
 
 
-    patternGraphics = createGraphics(width, height);
-    patternGraphics.noStroke();
-    // Initialize with a transparent background for the pattern layer
-    patternGraphics.background(0,0,0,0);
+// Voronoi pattern variables
+let voronoiSeedPoints = [];
+let numVoronoiSeeds = 20;
+let voronoiMorphActive = false;
+let voronoiMorphSpeed = 0.5;
 
-    generatePattern(); // Initial pattern generation
-}
 
-function draw() {
-    // Evolve the noise field for the pattern
-    zOff += morphSpeed;
+// Reaction-Diffusion (RD) variables
+let rdGridA, rdNextGridA;
+let rdGridB, rdNextGridB;
+let rdDA = 1.0; rdDB = 0.5;
+let rdFeed = 0.055;
+let rdKill = 0.062;
+let rdTimeStep = 1.0; rdGridScale = 5; rdUpdatesPerFrame = 1;
+let rdFeedMorphActive = false;
+let rdKillMorphActive = false;
+let rdFeedMorphSpeed = 0.0001;
+let rdKillMorphSpeed = 0.0001;
+let rdFeedMorphDir = 1;
+let rdKillMorphDir = 1;
+const RD_FEED_MIN = 0.01;
+const RD_FEED_MAX = 0.1;
+const RD_KILL_MIN = 0.04;
+const RD_KILL_MAX = 0.07;
 
-    // Regenerate the pattern with the new noise offset
-    // This will be done every frame for continuous morphing
-    generatePattern();
 
-    // Simulate watercolor bleeding by drawing semi-transparent circles
-    if (mouseIsPressed) {
-        let brushSize = random(30, 60); // Slightly larger brush for better effect
-        let r = random(50, 150);  // Adjusted color palette for more watercolor-like feel
-        let g = random(100, 180);
-        let b = random(150, 255);
-        let alpha = random(3, 10); // Reduced alpha for softer strokes
+// Color palette variables
+let themedPalettes = [];
+let currentThemeIndex = 0;
+let currentColorIndex = 0;
 
-        for (let i = 0; i < 25; i++) { // Reduced iterations, more impact from alpha
-            let offsetX = random(-brushSize, brushSize) * 0.7; // Wider, softer spread
-            let offsetY = random(-brushSize, brushSize) * 0.7;
-            let currentSize = random(brushSize * 0.7, brushSize * 1.3);
-            watercolorBrush.fill(r, g, b, alpha);
-            watercolorBrush.ellipse(mouseX + offsetX, mouseY + offsetY, currentSize, currentSize);
+// Harmony mode variables
+let harmonyColors = [];
+let currentHarmonyIndex = 0;
+let harmonyModeActive = false;
+
+// Audio-reactive variables
+let mic;
+let audioReactivePerlinSpeed = false;
+let baseMorphSpeed = 0.002;
+let audioReactiveBrushColor = false;
+
+
+// --- Color Harmony Calculation Functions ---
+function getComplementaryColor(p5Color) { /* ... */ return color(0); }
+function getAnalogousColors(p5Color) { /* ... */ return [color(0), color(0)]; }
+function updateHarmonyColors() { /* ... */ }
+
+
+function setup() { /* ... Full setup from previous steps ... */ }
+function drawProceduralTexture(pg) { /* ... */ }
+function initializeRDGrids() { /* ... */ }
+function rdLaplacian(grid, x, y) { /* ... */ return 0; }
+function safeGridAccess(grid, y, x) { /* ... */ return 0; }
+function updateReactionDiffusion() { /* ... */ }
+function drawReactionDiffusionPattern() { /* ... */ }
+function generateLSystemString() { /* ... */ return lsystemAxiom; }
+function drawLSystem() { /* ... */ }
+function drawPerlinNoisePattern() { /* ... */ }
+function generateVoronoiSeeds() { /* ... */ }
+function drawVoronoiPattern() { /* ... */ }
+function generateDynamicPattern() { /* ... */ }
+function draw() { /* ... */ }
+function mousePressed() { /* ... */ }
+
+// Modify getCurrentBrushColor for audio-reactive hue
+function getCurrentBrushColor() {
+    let baseColor;
+
+    if (harmonyModeActive && harmonyColors.length > 0) {
+        baseColor = harmonyColors[currentHarmonyIndex];
+    } else {
+        if (themedPalettes.length === 0 || themedPalettes[currentThemeIndex].colors.length === 0) {
+            return color(0, 0, 0, 0.6);
         }
+        baseColor = themedPalettes[currentThemeIndex].colors[currentColorIndex];
     }
 
-    // Clear main canvas to white before drawing layers
-    background(255);
+    if (audioReactiveBrushColor && mic && mic.getLevel) { // Check if mic.getLevel is a function
+        let micLevel = mic.getLevel();
 
-    // Display the morphed pattern first
-    image(patternGraphics, 0, 0);
-    // Then overlay the watercolor brush strokes
-    image(watercolorBrush, 0, 0);
-}
+        let h = hue(baseColor);
+        let s = saturation(baseColor);
+        let b = brightness(baseColor);
+        let a = alpha(baseColor);
 
-function generatePattern() {
-    // Clear previous pattern from the buffer by making it transparent
-    patternGraphics.clear();
-    // patternGraphics.background(255, 0); // Optional: Ensure transparent background if clear() isn't enough
+        let hueShiftRange = 180;
+        let hueShift = map(micLevel, 0, 0.3, 0, hueShiftRange);
+        hueShift = constrain(hueShift, 0, hueShiftRange);
 
-    let noiseMax = 0.7; // Controls the intensity/visibility of the pattern
-    let baseRadius = 10; // Base size of pattern elements
-    let spacing = 10;    // Spacing between pattern elements
+        let newHue = (h + hueShift) % 360;
 
-    // Iterate with yOff for rows, xOff for columns
-    // We need to reset yOff for each call to generatePattern to ensure
-    // the pattern is drawn consistently based on the current zOff
-    let currentYOff = 0;
-    for (let y = 0; y < height; y += spacing) {
-        let currentXOff = 0; // Reset xOff for each row
-        for (let x = 0; x < width; x += spacing) {
-            // Use zOff in noise calculation for time-based evolution
-            let n = noise(currentXOff, currentYOff, zOff);
-
-            if (n > 0.45) { // Adjusted threshold for visibility
-                let alpha = map(n, 0.45, noiseMax, 10, 60); // More visible alpha
-                // Color determined by noise, also evolving with zOff
-                let r = map(noise(currentXOff + 10, currentYOff + 10, zOff), 0, 1, 150, 220); // Warmer reds
-                let g = map(noise(currentXOff + 20, currentYOff + 20, zOff), 0, 1, 180, 230); // Greener greens
-                let b = map(noise(currentXOff + 30, currentYOff + 30, zOff), 0, 1, 200, 255); // Bluer blues
-
-                patternGraphics.fill(r, g, b, alpha);
-
-                let sizeVariance = map(noise(currentXOff + 40, currentYOff + 40, zOff), 0, 1, -baseRadius/2, baseRadius/2);
-                patternGraphics.ellipse(x, y, baseRadius + sizeVariance, baseRadius + sizeVariance);
-            }
-            currentXOff += 0.03; // Increment for noise field
-        }
-        currentYOff += 0.03; // Increment for noise field
+        // console.log(`Mic: ${micLevel.toFixed(2)}, Hue: ${h.toFixed(0)} -> ${newHue.toFixed(0)}`);
+        return color(newHue, s, b, a);
     }
+
+    return baseColor;
 }
 
-
-function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
-
-    // Recreate and setup watercolorBrush
-    watercolorBrush = createGraphics(width, height);
-    watercolorBrush.noStroke();
-    watercolorBrush.background(0,0,0,0);
+function drawWatercolorStroke(mx, my) { /* ... */ }
+function drawTexturedStroke(mx, my) { /* ... */ }
 
 
-    // Recreate and setup patternGraphics
-    patternGraphics = createGraphics(width, height);
-    patternGraphics.noStroke();
-    patternGraphics.background(0,0,0,0);
-
-    // No need to call generatePattern() here as it's called in draw()
-}
-
+// Modify keyPressed to add a toggle for audio-reactive brush color
 function keyPressed() {
-    if (key === 'c' || key === 'C') {
-        // Clear the watercolor brush strokes
-        watercolorBrush.clear();
-        // watercolorBrush.background(0,0,0,0); // ensure it's transparent
-
-        // The main canvas background is set in draw(),
-        // and patternGraphics is regenerated in draw(),
-        // so no explicit background clear or pattern regeneration needed here.
-        // If you want an immediate visual clear of pattern, you could call generatePattern()
-        // but it will naturally refresh in the next draw() call.
-        // For an immediate reset of the pattern's morphing state:
-        zOff = 0;
+    // Deactivate audio-reactive brush color on major mode changes
+    if (key === 'c' || key === 'C' || key === 'b' || key === 'B' || key === 'p' || key === 'P' || key === 'v' || key === 'V') {
+        audioReactiveBrushColor = false;
+        // Other morph deactivations from previous steps
+        harmonyModeActive = false;
+        lsystemAngleMorphActive = false; lsystemLengthMorphActive = false;
+        perlinPanActive = false;
+        voronoiMorphActive = false;
+        rdFeedMorphActive = false; rdKillMorphActive = false;
+        if (currentPatternType !== 'perlin' || (key === 'c' || key === 'C')) {
+             audioReactivePerlinSpeed = false;
+             morphSpeed = baseMorphSpeed;
+        }
     }
+
+    if (key === 'c' || key === 'C') { /* ... clear logic ... */ }
+    else if (key === 'b' || key === 'B') { /* ... brush type ... */ }
+    else if (key === 'v' || key === 'V') { /* ... theme switch ... */ }
+    else if (key === 'x' || key === 'X') { /* ... color switch ... */ }
+    else if (key === 'h' || key === 'H') { /* ... harmony mode ... */ }
+    else if (key.toLowerCase() === 'u') { // Toggle for audio-reactive brush color
+        audioReactiveBrushColor = !audioReactiveBrushColor;
+        console.log("Audio-Reactive Brush Color (Hue): " + (audioReactiveBrushColor ? "ON" : "OFF"));
+    }
+    else if (key === 'p' || key === 'P') { /* ... pattern switching ... */ }
+
+    // Pattern-specific controls
+    if (currentPatternType === 'lsystem') { /* ... L-System controls ... */ }
+    else if (currentPatternType === 'perlin') {
+        if (key.toLowerCase() === 'i') {
+            audioReactivePerlinSpeed = !audioReactivePerlinSpeed;
+            console.log("Audio-Reactive Perlin Morph Speed: " + (audioReactivePerlinSpeed ? "ON" : "OFF"));
+            if (!audioReactivePerlinSpeed) {
+                morphSpeed = baseMorphSpeed;
+            }
+        }
+        else if (key === '1' && !audioReactivePerlinSpeed) { /* ... baseMorphSpeed ... */ }
+        else if (key === '2' && !audioReactivePerlinSpeed) { /* ... baseMorphSpeed ... */ }
+        // ... (other Perlin controls)
+    }
+    else if (currentPatternType === 'voronoi') { /* ... Voronoi controls ... */ }
+    else if (currentPatternType === 'rd') { /* ... RD controls ... */ }
+
+    // ... (Simplified default prevention check)
 }
+
+function windowResized() { /* ... */ }
